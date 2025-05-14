@@ -1,12 +1,50 @@
 from pirc522 import RFID
+import RPi.GPIO as GPIO
+import json
+
+INPUT_PIN = 10
+
+def Get_Tag_Input(rfid, entity_dict):
+    # Wait for a card to be detected
+    rfid.wait_for_tag()
+
+    # Request the tag
+    (error, tag_type) = rfid.request()
+    if not error:
+        print(f"Tag detected: {tag_type}")
+
+        # Get the UID of the tag
+        (error, uid) = rfid.anticoll()
+        if not error:
+            print(f"UID: {uid}")
+            # Select Tag is required before Auth
+            if not rfid.select_tag(uid):
+                # Auth for block 10 (block 2 of sector 2) using default shipping key A
+                if not rfid.card_auth(rfid.auth_a, 10, [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF], uid): # this is good
+                    block_data= rfid.read(10)
+
+                    # Assume we haven't found a matching entity yet
+                    matched_name = ""
+
+                    # Loop through the entity_dict
+                    for key, tag in entity_dict.items():
+                        if tag == block_data:
+                            matched_name = key
+                            break  # Found a match, no need to keep looking
+
+                    # Now create the new Entity
+                    scanned_entity = Entity(name=matched_name, entity_tag=block_data)
+                    
+                    
+                    print(f"Scanned entity: {scanned_entity.name}")
+                    # Always stop crypto1 when done working
+                    rfid.stop_crypto()
+                    return scanned_entity
+                    
+
 
 def main():
-    entity_dict = {
-        "entity1": [72, 101, 108, 108, 111, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        "entity2": [72, 101, 108, 108, 111, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        "entity3": [72, 101, 108, 108, 111, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    } # stick this in a json somewhere
-
+    entity_dict = json.load('entities.json')
     # Initialize RFID reader
     rfid = RFID()
 
@@ -14,16 +52,22 @@ def main():
     startCombat = False
     creatureList = []
     firstLoop = True    
+    orderingDone = False
+    GPIO.setwarnings(False) # Ignore warning for now
+    GPIO.setmode(GPIO.BOARD) # Use physical pin numbering
+    GPIO.setup(INPUT_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+    # add async function for main loop
+    # add async function for shutdown/reset
 
     while True:
         if startCombat and firstLoop: # Replace with actual button press detection logic
                 print("Starting Combat, scan minis using the RFID reader...")
                 print("Place your RFID card near the reader...")
-                orderingDone = False
-                ## orderingDone button logic placeholder
-                button_pressed = False  # Replace with actual button press detection logic
-                if button_pressed:
-                    orderingDone = True
+                
+                if GPIO.input(INPUT_PIN) == GPIO.HIGH:
+                    orderingDone = True  
+
+                if orderingDone:
                     print("Combat order completed.") # add "are you sure?" prompt
                     for entity in creatureList:
                         combatOrder.append(entity)
@@ -32,40 +76,8 @@ def main():
                     rfid.cleanup()
 
                 while not orderingDone:
-                    # Wait for a card to be detected
-                    rfid.wait_for_tag()
-
-                    # Request the tag
-                    (error, tag_type) = rfid.request()
-                    if not error:
-                        print(f"Tag detected: {tag_type}")
-
-                        # Get the UID of the tag
-                        (error, uid) = rfid.anticoll()
-                        if not error:
-                            print(f"UID: {uid}")
-                            # Select Tag is required before Auth
-                            if not rfid.select_tag(uid):
-                                # Auth for block 10 (block 2 of sector 2) using default shipping key A
-                                if not rfid.card_auth(rfid.auth_a, 10, [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF], uid): # this is good
-                                    block_data= rfid.read(10)
-
-                                    # Assume we haven't found a matching entity yet
-                                    matched_name = ""
-
-                                    # Loop through the entity_dict
-                                    for key, tag in entity_dict.items():
-                                        if tag == block_data:
-                                            matched_name = key
-                                            break  # Found a match, no need to keep looking
-
-                                    # Now create the new Entity
-                                    scanned_entity = Entity(name=matched_name, entity_tag=block_data)
-                                    creatureList.append(scanned_entity)
-                                    
-                                    print(f"Scanned entity: {scanned_entity.name}")
-                                    # Always stop crypto1 when done working
-                                    rfid.stop_crypto()
+                    creatureList.append(Get_Tag_Input(rfid, entity_dict))
+                    
         elif startCombat and not firstLoop: # Replace with actual button press detection logic
             combatInProgress = True
             while combatInProgress:
