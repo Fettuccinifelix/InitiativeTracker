@@ -1,152 +1,39 @@
 from pirc522 import RFID
 import RPi.GPIO as GPIO
 import json
+from lib import Initialization_Mode, detect_button_press, initialize_combat, run_combat
+from classes import CircularLinkedList
+import asyncio
 
 INPUT_PIN = 10
-
-def Get_Tag_Input(rfid, entity_dict):
-    # Wait for a card to be detected
-    rfid.wait_for_tag()
-
-    # Request the tag
-    (error, tag_type) = rfid.request()
-    if not error:
-        print(f"Tag detected: {tag_type}")
-
-        # Get the UID of the tag
-        (error, uid) = rfid.anticoll()
-        if not error:
-            print(f"UID: {uid}")
-            # Select Tag is required before Auth
-            if not rfid.select_tag(uid):
-                # Auth for block 10 (block 2 of sector 2) using default shipping key A
-                if not rfid.card_auth(rfid.auth_a, 10, [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF], uid): # this is good
-                    block_data= rfid.read(10)
-
-                    # Assume we haven't found a matching entity yet
-                    matched_name = ""
-
-                    # Loop through the entity_dict
-                    for key, tag in entity_dict.items():
-                        if tag == block_data:
-                            matched_name = key
-                            break  # Found a match, no need to keep looking
-
-                    # Now create the new Entity
-                    scanned_entity = Entity(name=matched_name, entity_tag=block_data)
-                    
-                    
-                    print(f"Scanned entity: {scanned_entity.name}")
-                    # Always stop crypto1 when done working
-                    rfid.stop_crypto()
-                    return scanned_entity
-                    
-
-
-def main():
-    entity_dict = json.load('entities.json')
-    # Initialize RFID reader
+              
+async def main_loop():
+    """Main program loop."""
     rfid = RFID()
-
-    combatOrder = CircularLinkedList()
-    startCombat = False
-    creatureList = []
-    firstLoop = True    
-    orderingDone = False
-    GPIO.setwarnings(False) # Ignore warning for now
-    GPIO.setmode(GPIO.BOARD) # Use physical pin numbering
+    GPIO.setwarnings(False)
+    GPIO.setmode(GPIO.BOARD)
     GPIO.setup(INPUT_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
-    # add async function for main loop
-    # add async function for shutdown/reset
 
-    while True:
-        if startCombat and firstLoop: # Replace with actual button press detection logic
-                print("Starting Combat, scan minis using the RFID reader...")
-                print("Place your RFID card near the reader...")
-                
-                if GPIO.input(INPUT_PIN) == GPIO.HIGH:
-                    orderingDone = True  
+    try:
+        mode = input("Select mode: [1] Normal  [2] Initialization\n>> ").strip()
 
-                if orderingDone:
-                    print("Combat order completed.") # add "are you sure?" prompt
-                    for entity in creatureList:
-                        combatOrder.append(entity)
-                        print(entity.name)
-                    firstLoop = False
-                    rfid.cleanup()
+        if mode == "2":
+            Initialization_Mode(rfid)
+            return
 
-                while not orderingDone:
-                    creatureList.append(Get_Tag_Input(rfid, entity_dict))
-                    
-        elif startCombat and not firstLoop: # Replace with actual button press detection logic
-            combatInProgress = True
-            while combatInProgress:
-                #press button to exit combat
-                button_pressed1 = False  # Replace with actual button press detection logic
-                if button_pressed1:
-                    combatInProgress = False
-                    print("Exiting combat...")
-                    # play victory music
-                    break
+        entity_dict = json.load(open("entities.json"))
+        combat_order = CircularLinkedList()
 
-                entity = combatOrder.traverse()
-                print(entity.name)
-                button_pressed2 = False  # Replace with actual button press detection logic
-                # pause until button pressed
-                # when button pressed, move to next entity
-            
-                
+        while True:
+            print("Press the button to start combat...")
+            await detect_button_press(INPUT_PIN)
+
+            await initialize_combat(rfid, entity_dict, combat_order)
+            await run_combat(combat_order)
+
+    finally:
+        rfid.cleanup()
+        GPIO.cleanup()
 
 if __name__ == "__main__":
-    main()
-
-class Entity: 
-    def __init__(self, name, entity_tag):
-        self.name = name
-        self.entity_tag = entity_tag
-
-    def __str__(self):
-        return f"Entity(name={self.name}, uid={self.uid})"
-    
-# Python Program of Traversal of Circular Linked List
-class Node:
-    def __init__(self, data):
-        # Initialize a node with data and next pointer
-        self.data = data
-        self.next = None
-
-# Circular Linked List class
-class CircularLinkedList:
-    def __init__(self):
-        # Initialize an empty circular linked list with head pointer pointing to None
-        self.head = None
-
-    def append(self, data):
-        # Append a new node with data to the end of the circular linked list
-        new_node = Node(data)
-        if not self.head:
-            # If the list is empty, make the new node point to itself
-            new_node.next = new_node
-            self.head = new_node
-        else:
-            current = self.head
-            while current.next != self.head:
-                # Traverse the list until the last node
-                current = current.next
-            # Make the last node point to the new node
-            current.next = new_node
-            # Make the new node point back to the head
-            new_node.next = self.head
-
-    def traverse(self):
-        # Traverse and display the elements of the circular linked list
-        if not self.head:
-            print("Circular Linked List is empty")
-            return
-        current = self.head
-        while True:
-            print(current.data, end=" -> ")
-            current = current.next
-            if current == self.head:
-                # Break the loop when we reach the head again
-                break
+    asyncio.run(main_loop())
