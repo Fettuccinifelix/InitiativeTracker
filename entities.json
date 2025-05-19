@@ -1,10 +1,34 @@
 {
-    "SchemaName": "Entity Data Reference",
-    "SchemaData": {
-        "Entity Names" : {
-            "entity1": [72, 101, 108, 108, 111, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            "entity2": [72, 101, 108, 108, 111, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            "entity3": [72, 101, 108, 108, 111, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-        }
-    }
-}
+    "creatures": [
+      {
+        "name": "Goblin",
+        "type": "Humanoid",
+        "alignment": "Neutral Evil",
+        "hit_points": 7,
+        "armor_class": 15,
+        "speed": 30,
+        "challenge_rating": 0.25,
+        "actions": [
+          {
+            "name": "Scimitar",
+            "type": "Melee Weapon Attack",
+            "attack_bonus": 4,
+            "damage": "1d6 + 2 slashing"
+          },
+          {
+            "name": "Shortbow",
+            "type": "Ranged Weapon Attack",
+            "attack_bonus": 4,
+            "damage": "1d6 + 2 piercing",
+            "range": "80/320 ft"
+          }
+        ],
+        "traits": [
+          {
+            "name": "Nimble Escape",
+            "description": "The goblin can take the Disengage or Hide action as a bonus action on each of its turns."
+          }
+        ]
+      }
+    ]
+  }
