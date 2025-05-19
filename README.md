@@ -3,5 +3,5 @@ Pet project I'm working on to be used for my upcoming Dungeons and Dragons campa
 As of 5/19/2025, it works completely out of a CLI, but I would like to develop some web interface
 
 Branch off project ideas:
->> Redesign this in Rust
->> Redesign the RC522 RFID reader
+- Redesign this in Rust
+- Redesign the RC522 RFID reader
